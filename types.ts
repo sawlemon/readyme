@@ -17,10 +17,15 @@ export interface Question {
   explanation: string;
 }
 
+export interface FileData {
+  name: string;
+  data: string; // Base64 for PDF, text content for others
+  mimeType: string;
+}
+
 export interface QuizConfig {
   topic: string;
-  fileData?: string; // Base64 of PDF
-  mimeType?: string;
+  files: FileData[]; 
   durationMinutes: number;
   questionCount: number;
   mode: QuizMode;

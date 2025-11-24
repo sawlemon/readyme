@@ -10,17 +10,19 @@ export const generateQuiz = async (config: QuizConfig): Promise<Question[]> => {
   let prompt = `You are a professional certification exam creator. Create a multiple choice quiz with EXACTLY ${config.questionCount} questions. This is a strict numerical requirement.`;
   
   if (config.topic && config.topic.trim().length > 0) {
-    prompt += ` The topic is: "${config.topic}".`;
+    prompt += `\n\nContext/Topic Description: "${config.topic}". Use this to guide the questions generated from any provided source materials below (if any), or as the primary topic if no files are provided.`;
   }
   
-  // Handle File Context
-  if (config.fileData) {
-    if (config.mimeType === 'application/pdf') {
-       prompt += ` Use the attached PDF document as the primary source material. Analyze it deeply.`;
-    } else {
-       // Text-based files (txt, md) are appended to the prompt for best analysis
-       prompt += `\n\n--- SOURCE MATERIAL BEGINS ---\n${config.fileData}\n--- SOURCE MATERIAL ENDS ---\n\nUse the source material above to generate the questions.`;
-    }
+  // Handle Files Context
+  if (config.files && config.files.length > 0) {
+    prompt += `\n\nAnalyze the following source materials deeply to generate the questions:`;
+    
+    // Append text-based file contents directly to prompt
+    config.files.forEach((file, index) => {
+        if (file.mimeType !== 'application/pdf') {
+             prompt += `\n\n--- SOURCE MATERIAL ${index + 1} (${file.name}) ---\n${file.data}\n--- END SOURCE MATERIAL ---\n`;
+        }
+    });
   }
 
   prompt += `
@@ -34,13 +36,17 @@ export const generateQuiz = async (config: QuizConfig): Promise<Question[]> => {
 
   const parts: any[] = [{ text: prompt }];
 
-  // Only attach inlineData for PDF. Text/MD is already in prompt.
-  if (config.fileData && config.mimeType === 'application/pdf') {
-    parts.push({
-      inlineData: {
-        data: config.fileData,
-        mimeType: config.mimeType,
-      },
+  // Attach inlineData for PDFs
+  if (config.files) {
+    config.files.forEach(file => {
+        if (file.mimeType === 'application/pdf') {
+            parts.push({
+                inlineData: {
+                    data: file.data,
+                    mimeType: file.mimeType,
+                },
+            });
+        }
     });
   }
 
@@ -74,8 +80,6 @@ export const generateQuiz = async (config: QuizConfig): Promise<Question[]> => {
 
     if (response.text) {
         const questions = JSON.parse(response.text) as Question[];
-        // Double check count, though the prompt implies strictness, the model might deviate slightly. 
-        // We accept what we get, but ideally it matches.
         return questions;
     }
   } catch (e) {

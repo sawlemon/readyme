@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { QuizConfig, QuizMode } from '../types';
+import { QuizConfig, QuizMode, FileData } from '../types';
 
 interface WelcomeScreenProps {
   onStart: (config: QuizConfig) => void;
@@ -10,47 +10,60 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStart }) => {
   const [duration, setDuration] = useState<string>("90");
   const [questionCount, setQuestionCount] = useState<string>("10");
   const [mode, setMode] = useState<QuizMode>(QuizMode.TEST);
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0]);
-      // Clear topic if file is uploaded to focus on file content
-      if (topic) setTopic(''); 
+    if (e.target.files && e.target.files.length > 0) {
+      const newFiles = Array.from(e.target.files);
+      setFiles(prev => [...prev, ...newFiles]);
     }
   };
 
+  const removeFile = (indexToRemove: number) => {
+    setFiles(prev => prev.filter((_, idx) => idx !== indexToRemove));
+  };
+
   const handleSubmit = async () => {
-    if (!topic && !file) return;
+    if (!topic && files.length === 0) return;
 
-    let fileData: string | undefined = undefined;
-    let mimeType: string | undefined = undefined;
+    const processedFiles: FileData[] = [];
 
-    if (file) {
-      if (file.type === 'application/pdf') {
-        fileData = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => {
-              const result = reader.result as string;
-              // Remove Data URL prefix for inlineData
-              const base64 = result.split(',')[1];
-              resolve(base64);
-          };
-          reader.onerror = reject;
-          reader.readAsDataURL(file);
+    if (files.length > 0) {
+      await Promise.all(files.map(async (file) => {
+        let data = '';
+        let mimeType = '';
+
+        if (file.type === 'application/pdf') {
+            data = await new Promise<string>((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => {
+                    const result = reader.result as string;
+                    // Remove Data URL prefix for inlineData
+                    const base64 = result.split(',')[1];
+                    resolve(base64);
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+            mimeType = 'application/pdf';
+        } else {
+            // Assume text/markdown/etc
+            data = await new Promise<string>((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result as string);
+                reader.onerror = reject;
+                reader.readAsText(file);
+            });
+            mimeType = 'text/plain'; // Internal flag for service to know it's text
+        }
+
+        processedFiles.push({
+            name: file.name,
+            data: data,
+            mimeType: mimeType
         });
-        mimeType = 'application/pdf';
-      } else {
-        // Assume text/markdown/etc
-        fileData = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = reject;
-          reader.readAsText(file);
-        });
-        mimeType = 'text/plain'; // Internal flag for service to know it's text
-      }
+      }));
     }
 
     const finalDuration = parseInt(duration) || 90;
@@ -58,13 +71,14 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStart }) => {
 
     onStart({
       topic,
-      fileData,
-      mimeType,
+      files: processedFiles,
       durationMinutes: finalDuration,
       questionCount: finalCount,
       mode
     });
   };
+
+  const hasFiles = files.length > 0;
 
   return (
     <div className="w-full min-h-full flex flex-col items-center justify-start pt-12 pb-32 px-4 sm:px-6">
@@ -95,68 +109,74 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStart }) => {
                 <span className="w-1.5 h-1.5 rounded-full bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,1)]"></span>
                 Input Source
              </label>
-             <span className="text-[10px] text-white/30 font-medium uppercase tracking-wider">{file ? 'File Mode' : 'Prompt Mode'}</span>
+             <span className="text-[10px] text-white/30 font-medium uppercase tracking-wider">
+               {hasFiles ? `${files.length} File${files.length > 1 ? 's' : ''} Attached` : 'Content & Prompt'}
+             </span>
           </div>
           
           <div className="grid grid-cols-1 gap-5">
             {/* Prompt Area */}
             <div className="relative group">
                <textarea
-                className={`w-full h-32 glass-input rounded-3xl p-5 resize-none text-base placeholder-white/20 transition-all 
-                ${file ? 'opacity-40 grayscale pointer-events-none' : 'opacity-100'}`}
-                placeholder="Enter a topic, paste study notes, or describe what you want to learn..."
+                className="w-full h-32 glass-input rounded-3xl p-5 resize-none text-base placeholder-white/20 transition-all opacity-100"
+                placeholder="Enter a topic, paste study notes, or add instructions for the uploaded files..."
                 value={topic}
-                onChange={(e) => {
-                    setTopic(e.target.value);
-                    if(e.target.value) setFile(null);
-                }}
+                onChange={(e) => setTopic(e.target.value)}
               />
             </div>
 
             <div className="flex items-center gap-3">
                 <div className="h-px bg-white/5 flex-1"></div>
-                <span className="text-[10px] uppercase text-white/20 font-bold tracking-widest">OR</span>
+                <span className="text-[10px] uppercase text-white/20 font-bold tracking-widest">+</span>
                 <div className="h-px bg-white/5 flex-1"></div>
             </div>
 
             {/* File Upload */}
-            <div 
-                onClick={() => fileInputRef.current?.click()}
-                className={`relative h-24 rounded-2xl border border-dashed transition-all cursor-pointer flex items-center justify-center overflow-hidden
-                ${file 
-                    ? 'border-emerald-500/30 bg-emerald-500/5' 
-                    : 'border-white/10 hover:border-white/20 hover:bg-white/5 bg-black/20'}`}
-            >
-              <input 
-                type="file" 
-                ref={fileInputRef} 
-                className="hidden" 
-                accept=".pdf,.txt,.md,text/plain,application/pdf"
-                onChange={handleFileChange}
-              />
-              
-              {file ? (
-                <div className="flex items-center space-x-4 animate-fade-in px-4 w-full">
-                    <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0">
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                    </div>
-                    <div className="flex-1 min-w-0 text-left">
-                        <p className="text-sm font-medium text-emerald-100 truncate">{file.name}</p>
-                        <p className="text-xs text-emerald-500/60 uppercase tracking-wider font-bold">Ready for analysis</p>
-                    </div>
-                    <button 
-                        onClick={(e) => { e.stopPropagation(); setFile(null); }}
-                        className="text-white/40 hover:text-white p-2"
-                    >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                    </button>
+            <div className="flex flex-col gap-3">
+                <div 
+                    onClick={() => fileInputRef.current?.click()}
+                    className={`relative h-24 rounded-2xl border border-dashed transition-all cursor-pointer flex items-center justify-center overflow-hidden
+                    ${hasFiles
+                        ? 'border-emerald-500/30 bg-emerald-500/5' 
+                        : 'border-white/10 hover:border-white/20 hover:bg-white/5 bg-black/20'}`}
+                >
+                  <input 
+                    type="file" 
+                    multiple
+                    ref={fileInputRef} 
+                    className="hidden" 
+                    accept=".pdf,.txt,.md,text/plain,application/pdf"
+                    onChange={handleFileChange}
+                  />
+                  
+                  <div className="flex items-center space-x-3 text-white/40 group-hover:text-white/60 transition-colors">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                        <span className="text-sm font-medium">Upload Files (PDF, Markdown, Text)</span>
+                  </div>
                 </div>
-              ) : (
-                <div className="flex items-center space-x-3 text-white/40 group-hover:text-white/60 transition-colors">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
-                    <span className="text-sm font-medium">Upload PDF, Markdown or Text</span>
-                </div>
-              )}
+
+                {/* File List */}
+                {hasFiles && (
+                    <div className="grid grid-cols-1 gap-2 animate-fade-in">
+                        {files.map((file, idx) => (
+                            <div key={idx} className="flex items-center space-x-4 px-4 py-3 rounded-xl bg-white/5 border border-white/5 hover:border-white/10 transition-colors">
+                                <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0">
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                </div>
+                                <div className="flex-1 min-w-0 text-left">
+                                    <p className="text-sm font-medium text-emerald-100 truncate">{file.name}</p>
+                                    <p className="text-[10px] text-emerald-500/60 uppercase tracking-wider font-bold">{(file.size / 1024).toFixed(1)} KB</p>
+                                </div>
+                                <button 
+                                    onClick={(e) => { e.stopPropagation(); removeFile(idx); }}
+                                    className="text-white/40 hover:text-white p-2 rounded-full hover:bg-white/10 transition-colors"
+                                >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
           </div>
         </div>
@@ -241,19 +261,19 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStart }) => {
         {/* Action Button */}
         <button
             onClick={handleSubmit}
-            disabled={!topic && !file}
+            disabled={!topic && !hasFiles}
             className={`w-full py-4 rounded-[1.5rem] text-base font-bold tracking-wide transition-all duration-300 relative overflow-hidden group border
-            ${!topic && !file 
+            ${!topic && !hasFiles 
                 ? 'bg-white/5 border-white/5 text-white/20 cursor-not-allowed' 
                 : 'bg-white text-black border-white/50 shadow-[0_0_20px_rgba(255,255,255,0.15)] hover:shadow-[0_0_40px_rgba(255,255,255,0.25)] hover:scale-[1.01] active:scale-[0.99]'}`}
         >
             <span className="relative z-10 flex items-center justify-center space-x-2">
                 <span>Generate Assessment</span>
-                {!(!topic && !file) && (
+                {!(!topic && !hasFiles) && (
                     <svg className="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
                 )}
             </span>
-            {(!topic && !file) ? null : <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/80 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>}
+            {(!topic && !hasFiles) ? null : <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/80 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>}
         </button>
       </div>
     </div>

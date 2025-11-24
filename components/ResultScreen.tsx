@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Question, QuizResult } from '../types';
 
 interface ResultScreenProps {
@@ -8,12 +8,21 @@ interface ResultScreenProps {
 }
 
 const ResultScreen: React.FC<ResultScreenProps> = ({ questions, result, onRetake }) => {
+  const [filter, setFilter] = useState<'ALL' | 'WRONG'>('ALL');
+  
   const percentage = Math.round((result.score / result.total) * 100);
   
   let colorClass = 'text-red-400';
   let strokeColor = '#f87171'; // red-400
   if (percentage >= 80) { colorClass = 'text-emerald-400'; strokeColor = '#34d399'; }
   else if (percentage >= 60) { colorClass = 'text-amber-400'; strokeColor = '#fbbf24'; }
+
+  const filteredQuestions = questions.map((q, i) => ({ q, i })).filter(({ i }) => {
+      if (filter === 'ALL') return true;
+      const userAns = result.answers.get(i);
+      const isCorrect = userAns === questions[i].correctIndex;
+      return !isCorrect;
+  });
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-12 animate-fade-in relative z-10 pb-24">
@@ -62,14 +71,41 @@ const ResultScreen: React.FC<ResultScreenProps> = ({ questions, result, onRetake
       </div>
 
       <div className="space-y-4">
-        <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-6 px-1">
-            <h2 className="text-xl font-bold text-white">Review</h2>
-            <div className="px-3 py-1 rounded-full bg-white/5 border border-white/5 text-xs font-medium text-white/50">
-                {questions.length} Items
+        <div className="flex flex-col md:flex-row items-center justify-between border-b border-white/10 pb-4 mb-6 px-1 gap-4">
+            <div className="flex items-center gap-3">
+                <h2 className="text-xl font-bold text-white">Review</h2>
+                <div className="px-3 py-1 rounded-full bg-white/5 border border-white/5 text-xs font-medium text-white/50">
+                    {filteredQuestions.length} Items
+                </div>
+            </div>
+
+            {/* Filter Toggle */}
+            <div className="bg-white/5 p-1 rounded-full flex border border-white/5 relative">
+                 <button
+                    onClick={() => setFilter('ALL')}
+                    className={`px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all duration-300 
+                    ${filter === 'ALL' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40 hover:text-white/60'}`}
+                >
+                    All Questions
+                </button>
+                <button
+                    onClick={() => setFilter('WRONG')}
+                    className={`px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all duration-300 
+                    ${filter === 'WRONG' ? 'bg-red-500/20 text-red-200 border border-red-500/20 shadow-sm' : 'text-white/40 hover:text-white/60'}`}
+                >
+                    Incorrect Only
+                </button>
             </div>
         </div>
+        
+        {filteredQuestions.length === 0 && (
+             <div className="py-12 text-center text-white/30 font-medium border border-dashed border-white/10 rounded-[2rem]">
+                 No questions match this filter.
+             </div>
+        )}
 
-        {questions.map((q, idx) => {
+        {filteredQuestions.map(({ q, i }) => {
+            const idx = i; // Original index
             const userAns = result.answers.get(idx);
             const isCorrect = userAns === q.correctIndex;
             return (
