@@ -10,6 +10,8 @@ export enum QuizMode {
   TEST = 'TEST'      // Reveals answers at the end
 }
 
+export type DifficultyLevel = 'Easy' | 'Medium' | 'Hard';
+
 export interface Question {
   question: string;
   options: string[];
@@ -29,6 +31,7 @@ export interface QuizConfig {
   durationMinutes: number;
   questionCount: number;
   mode: QuizMode;
+  difficulty: DifficultyLevel;
 }
 
 export interface QuizResult {

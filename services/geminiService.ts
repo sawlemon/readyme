@@ -28,7 +28,7 @@ export const generateQuiz = async (config: QuizConfig): Promise<Question[]> => {
   prompt += `
     Requirements:
     1. Questions must be relevant to the topic/material.
-    2. Vary difficulty (Easy, Medium, Hard).
+    2. Difficulty Level: ${config.difficulty}. Ensure the complexity, depth, and nuance of the questions and options strictly match this difficulty level.
     3. Each question must have EXACTLY 4 options.
     4. Provide a detailed, educational explanation for the correct answer.
     5. Output must be valid JSON matching the schema.

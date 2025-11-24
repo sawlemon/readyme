@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { QuizConfig, QuizMode, FileData } from '../types';
+import { QuizConfig, QuizMode, FileData, DifficultyLevel } from '../types';
 
 interface WelcomeScreenProps {
   onStart: (config: QuizConfig) => void;
@@ -10,6 +10,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStart }) => {
   const [duration, setDuration] = useState<string>("90");
   const [questionCount, setQuestionCount] = useState<string>("10");
   const [mode, setMode] = useState<QuizMode>(QuizMode.TEST);
+  const [difficulty, setDifficulty] = useState<DifficultyLevel>('Medium');
   const [files, setFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -74,7 +75,8 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStart }) => {
       files: processedFiles,
       durationMinutes: finalDuration,
       questionCount: finalCount,
-      mode
+      mode,
+      difficulty
     });
   };
 
@@ -209,51 +211,75 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStart }) => {
               </div>
             </div>
 
-            {/* Config Inputs */}
+            {/* Difficulty Selection */}
             <div className="space-y-3">
-                <label className="text-[10px] font-bold text-orange-300/80 uppercase tracking-widest flex items-center gap-2 px-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-orange-400 shadow-[0_0_8px_rgba(251,146,60,1)]"></span>
-                    Settings
-                </label>
-                <div className="flex gap-3">
-                    <div className="flex-1 glass-input rounded-2xl p-3 relative group focus-within:bg-black/40 transition-colors">
-                        <label className="text-[9px] text-white/40 font-bold uppercase block mb-1">Time (Min)</label>
-                        <input 
-                            type="text" 
-                            inputMode="numeric"
-                            value={duration} 
-                            onChange={(e) => {
-                                if (/^\d*$/.test(e.target.value)) setDuration(e.target.value);
-                            }}
-                            onBlur={() => {
-                                let val = parseInt(duration);
-                                if (isNaN(val) || val < 1) val = 1;
-                                if (val > 180) val = 180;
-                                setDuration(val.toString());
-                            }}
-                            className="bg-transparent text-xl font-bold text-white w-full outline-none placeholder-white/20"
-                            placeholder="90"
-                        />
-                    </div>
-                    <div className="flex-1 glass-input rounded-2xl p-3 relative group focus-within:bg-black/40 transition-colors">
-                        <label className="text-[9px] text-white/40 font-bold uppercase block mb-1">Questions</label>
-                        <input 
-                            type="text" 
-                            inputMode="numeric"
-                            value={questionCount} 
-                            onChange={(e) => {
-                                if (/^\d*$/.test(e.target.value)) setQuestionCount(e.target.value);
-                            }}
-                            onBlur={() => {
-                                let val = parseInt(questionCount);
-                                if (isNaN(val) || val < 1) val = 1;
-                                if (val > 100) val = 100;
-                                setQuestionCount(val.toString());
-                            }}
-                            className="bg-transparent text-xl font-bold text-white w-full outline-none placeholder-white/20"
-                            placeholder="10"
-                        />
-                    </div>
+              <label className="text-[10px] font-bold text-pink-300/80 uppercase tracking-widest flex items-center gap-2 px-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-pink-400 shadow-[0_0_8px_rgba(244,114,182,1)]"></span>
+                Difficulty
+              </label>
+              <div className="bg-black/20 p-1 rounded-[1.2rem] flex border border-white/5 relative isolate">
+                  <div 
+                    className={`absolute inset-y-1 w-[calc(33.333%-2.6px)] bg-white/10 rounded-[0.9rem] border border-white/10 shadow-lg backdrop-blur-md transition-all duration-300 ease-out z-[-1]
+                    ${difficulty === 'Easy' ? 'translate-x-0' : difficulty === 'Medium' ? 'translate-x-[calc(100%+4px)]' : 'translate-x-[calc(200%+8px)]'}`}
+                  ></div>
+                  
+                  {(['Easy', 'Medium', 'Hard'] as DifficultyLevel[]).map((level) => (
+                      <button
+                          key={level}
+                          onClick={() => setDifficulty(level)}
+                          className={`flex-1 py-3 text-xs font-bold uppercase tracking-wider transition-colors duration-300 ${difficulty === level ? 'text-white' : 'text-white/40 hover:text-white/60'}`}
+                      >
+                          {level}
+                      </button>
+                  ))}
+              </div>
+            </div>
+        </div>
+
+        {/* Numeric Settings */}
+        <div className="space-y-3 mb-8">
+            <label className="text-[10px] font-bold text-orange-300/80 uppercase tracking-widest flex items-center gap-2 px-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-orange-400 shadow-[0_0_8px_rgba(251,146,60,1)]"></span>
+                Settings
+            </label>
+            <div className="flex gap-4">
+                <div className="flex-1 glass-input rounded-2xl p-3 relative group focus-within:bg-black/40 transition-colors">
+                    <label className="text-[9px] text-white/40 font-bold uppercase block mb-1">Time (Min)</label>
+                    <input 
+                        type="text" 
+                        inputMode="numeric"
+                        value={duration} 
+                        onChange={(e) => {
+                            if (/^\d*$/.test(e.target.value)) setDuration(e.target.value);
+                        }}
+                        onBlur={() => {
+                            let val = parseInt(duration);
+                            if (isNaN(val) || val < 1) val = 1;
+                            if (val > 180) val = 180;
+                            setDuration(val.toString());
+                        }}
+                        className="bg-transparent text-xl font-bold text-white w-full outline-none placeholder-white/20"
+                        placeholder="90"
+                    />
+                </div>
+                <div className="flex-1 glass-input rounded-2xl p-3 relative group focus-within:bg-black/40 transition-colors">
+                    <label className="text-[9px] text-white/40 font-bold uppercase block mb-1">Questions</label>
+                    <input 
+                        type="text" 
+                        inputMode="numeric"
+                        value={questionCount} 
+                        onChange={(e) => {
+                            if (/^\d*$/.test(e.target.value)) setQuestionCount(e.target.value);
+                        }}
+                        onBlur={() => {
+                            let val = parseInt(questionCount);
+                            if (isNaN(val) || val < 1) val = 1;
+                            if (val > 100) val = 100;
+                            setQuestionCount(val.toString());
+                        }}
+                        className="bg-transparent text-xl font-bold text-white w-full outline-none placeholder-white/20"
+                        placeholder="10"
+                    />
                 </div>
             </div>
         </div>
